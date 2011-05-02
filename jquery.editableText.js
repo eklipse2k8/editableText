@@ -15,22 +15,26 @@
      * could add public methods here
      */
 	$.editableText = {};
-    $.editableText.defaults = {		 
+    $.editableText.defaults = {
 		/**
-		 * Pass true to enable line breaks.
-		 * Useful with divs that contain paragraphs.
+		 * Pass true to enable line breaks. Useful with divs that contain paragraphs.
+		 * If false, prevents user from adding newlines to headers, links, etc.
 		 */
 		newlinesEnabled : false,
 		/**
 		 * Event that is triggered when editable text is changed
 		 */
-		changeEvent : 'change'
+		changeEvent : 'change',
+		compensateTopMargin: true,
+		editTitle: 'Edit',
+		saveTitle: 'Save',
+		cancelTitle: 'Discard',
 	};   		
 	/**
 	 * Usage $('selector).editableText(optionArray);
 	 * See $.editableText.defaults for valid options 
 	 */		
-    $.fn.editableText = function(options){
+    $.fn.editableText = function( options ) {
         var options = $.extend({}, $.editableText.defaults, options);
         
         return this.each(function(){
@@ -45,57 +49,77 @@
 			// Create edit/save buttons
             var buttons = $(
 				"<div class='editableToolbar'>" +
-            		"<a href='#' class='edit'></a>" +
-            		"<a href='#' class='save'></a>" +
-            		"<a href='#' class='cancel'></a>" +
+            		"<a href='#' class='edit' title='" + options.editTitle + "'></a>" +
+            		"<a href='#' class='save' title='" + options.saveTitle + "'></a>" +
+            		"<a href='#' class='cancel' title='" + options.cancelTitle + "'></a>" +
             	"</div>")
 				.insertBefore(editable);
 			
-			// Save references and attach events            
-			var editEl = buttons.find('.edit').click(function() {
+			var edit = function( ev ) {
+				ev.preventDefault();
 				startEditing();
-				return false;
-			});							
-			
-			buttons.find('.save').click(function(){
-				stopEditing();
-				editable.trigger(options.changeEvent);
-				return false;
-			});
-						
-			buttons.find('.cancel').click(function(){
-				stopEditing();
-				editable.html(prevValue);
-				return false;
-			});		
-			
-			// Display only edit button			
-			buttons.children().css('display', 'none');
-			editEl.show();			
-			
-			if (!options.newlinesEnabled){
-				// Prevents user from adding newlines to headers, links, etc.
-				editable.keypress(function(event){
-					// event is cancelled if enter is pressed
-					return event.which != 13;
-				});
 			}
+			
+			var save = function( ev ) {
+				ev.preventDefault();
+				ev.stopImmediatePropagation();
+				stopEditing();
+				prevValue = editable.html();
+				
+				// Strip trailing ' <br>'; seems to occur (at least in FF) when doing <space><enter>,
+				// even when cancelling the keyPress event.
+				if ( !options.newlinesEnabled && prevValue.match( /<br>$/ ) ) {
+					prevValue = prevValue.substr( 0, prevValue.length - 4 );
+				}
+				editable.trigger(options.changeEvent, [ prevValue ]);
+			}
+			
+			var cancel = function( ev ) {
+				ev.preventDefault();
+				ev.stopImmediatePropagation();
+				stopEditing();
+				editable.html( prevValue );
+				return false;
+			}
+			
+			// Save references and attach events
+			var editEl = buttons.find('.edit').click( edit );
+			buttons.find('.save').click( save );
+			buttons.find('.cancel').click( cancel );
+			
+			// Display only edit button
+			buttons.children().css('display', 'none');
+			editEl.show();
+			
+			editable.dblclick( edit );
+			// Bind on 'keydown' so we'll be first; for example, jQuery.ui.dialog closes the dialog on keydown for escape.
+			editable.keydown( function( ev ) {
+				// Save on enter, if not allowed to add newlines
+				if ( ev.keyCode === 13 && !options.newlinesEnabled ) {
+					save( ev );
+				}
+				// Cancel on escape
+				if ( ev.keyCode === 27 ) {
+					cancel( ev );
+				}
+			});
+			
+			options.compensateTopMargin && buttons.css( { 'margin-top': editable.css('margin-top') } );
 			
 			/**
 			 * Makes element editable
 			 */
-			function startEditing(){               
+			function startEditing() {
                 buttons.children().show();
                 editEl.hide();
-				                
-	            editable.attr('contentEditable', true);
+	            editable.attr('contentEditable', true).focus();
 			}
 			/**
 			 * Makes element non-editable
 			 */
-			function stopEditing(){
+			function stopEditing() {
 				buttons.children().hide();
-				editEl.show();				
+				editEl.show().focus();
                 editable.attr('contentEditable', false);
 			}
         });
