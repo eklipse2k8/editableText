@@ -1,58 +1,33 @@
 /**
  * editableText plugin that uses contentEditable property (FF2 is not supported)
- * Project page - http://github.com/valums/editableText
- * Copyright (c) 2009 Andris Valums, http://valums.com
+ * Project page - https://github.com/PaulUithol/editableText
+ * Forked from http://github.com/valums/editableText, copyright (c) 2009 Andris Valums, http://valums.com
  * Licensed under the MIT license (http://valums.com/mit-license/)
  */
-(function(){
-    /**
-     * The dollar sign could be overwritten globally,
-     * but jQuery should always stay accesible
-     */
-    var $ = jQuery;
+(function( $ ){		
 	/**
-     * Extending jQuery namespace, we
-     * could add public methods here
-     */
-	$.editableText = {};
-    $.editableText.defaults = {
-		/**
-		 * Pass true to enable line breaks. Useful with divs that contain paragraphs.
-		 * If false, prevents user from adding newlines to headers, links, etc.
-		 */
-		newlinesEnabled : false,
-		/**
-		 * Event that is triggered when editable text is changed
-		 */
-		changeEvent : 'change',
-		compensateTopMargin: true,
-		editTitle: 'Edit',
-		saveTitle: 'Save',
-		cancelTitle: 'Discard',
-	};   		
-	/**
-	 * Usage $('selector).editableText(optionArray);
-	 * See $.editableText.defaults for valid options 
-	 */		
+	 * Usage $('selector).editableText( options );
+	 * See $.fn.editableText.defaults for valid options 
+	 */
     $.fn.editableText = function( options ) {
-        var options = $.extend({}, $.editableText.defaults, options);
-        
-        return this.each(function(){
-             // Add jQuery methods to the element
-            var editable = $(this);
-            
+		options = $.extend({}, $.fn.editableText.defaults, options);
+		
+        return this.each( function() {
+			// Add jQuery methods to the element
+			var editable = $(this);
+			
 			/**
 			 * Save value to restore if user presses cancel
 			 */
 			var prevValue = editable.html();
 			
 			// Create edit/save buttons
-            var buttons = $(
+			var buttons = $(
 				"<div class='editableToolbar'>" +
-            		"<a href='#' class='edit' title='" + options.editTitle + "'></a>" +
-            		"<a href='#' class='save' title='" + options.saveTitle + "'></a>" +
-            		"<a href='#' class='cancel' title='" + options.cancelTitle + "'></a>" +
-            	"</div>")
+					"<a href='#' class='edit' title='" + options.editTitle + "'></a>" +
+					"<a href='#' class='save' title='" + options.saveTitle + "'></a>" +
+					( options.showCancel ? "<a href='#' class='cancel' title='" + options.cancelTitle + "'></a>" : '' ) +
+				"</div>")
 				.insertBefore(editable);
 			
 			var edit = function( ev ) {
@@ -67,10 +42,11 @@
 				prevValue = editable.html();
 				
 				// Strip trailing ' <br>'; seems to occur (at least in FF) when doing <space><enter>,
-				// even when cancelling the keyPress event.
+				// even when cancelling the keydown event.
 				if ( !options.newlinesEnabled && prevValue.match( /<br>$/ ) ) {
 					prevValue = prevValue.substr( 0, prevValue.length - 4 );
 				}
+				
 				editable.trigger(options.changeEvent, [ prevValue ]);
 			}
 			
@@ -104,6 +80,8 @@
 				}
 			});
 			
+			options.saveOnBlur && editable.blur( save );
+			
 			options.compensateTopMargin && buttons.css( { 'margin-top': editable.css('margin-top') } );
 			
 			/**
@@ -123,5 +101,34 @@
                 editable.attr('contentEditable', false);
 			}
         });
-    }
-})();
+    };
+	
+	$.fn.editableText.defaults = {
+		/**
+		 * Pass true to enable line breaks. Useful with divs that contain paragraphs.
+		 * If false, prevents user from adding newlines to headers, links, etc.
+		 */
+		newlinesEnabled : false,
+		/**
+		 * Event that is triggered when editable text is changed.
+		 * Passes the new element value as the first parameter.
+		 */
+		changeEvent : 'change',
+		/**
+		 * Adjust the top margin for the buttons to the margin on the editable element.
+		 * Useful for headings, etc.
+		 */
+		compensateTopMargin: true,
+		/**
+		 * Titles for the 'edit', 'save' and 'cancel' buttons
+		 */
+		editTitle: 'Edit',
+		saveTitle: 'Save',
+		cancelTitle: 'Discard',
+		/**
+		 * Whether or not the 'blur' event should trigger 'save'.
+		 */
+		saveOnBlur: true,
+		showCancel: true
+	};
+})( jQuery );
