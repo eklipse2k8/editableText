@@ -28,7 +28,8 @@
 					"<a href='#' class='save' title='" + options.saveTitle + "'></a>" +
 					( options.showCancel ? "<a href='#' class='cancel' title='" + options.cancelTitle + "'></a>" : '' ) +
 				"</div>")
-				.insertBefore(editable);
+				.insertBefore( editable )
+				.css( { 'zIndex': ( parseInt( editable.css('zIndex'), 10 ) || 0 ) + 1 } );
 			
 			var edit = function( ev ) {
 				ev.preventDefault();
@@ -36,18 +37,29 @@
 			}
 			
 			var save = function( ev ) {
+				// If the event is 'blur', defer executing the save, to allow 'click' events (on one of the buttons) to trigger first.
+				if ( ev.type === 'blur' ) {
+					ev.type = 'blurred';
+					setTimeout( function() { save( ev ) }, 10 );
+					return;
+				}
+				
+				if ( !isInEditMode() ) {
+					return;
+				}
+				
 				ev.preventDefault();
 				ev.stopImmediatePropagation();
 				stopEditing();
 				prevValue = editable.html();
 				
-				// Strip trailing ' <br>'; seems to occur (at least in FF) when doing <space><enter>,
+				// Strip trailing ' <br>'; seems to occur (at least in FF) when typing <space>, then <enter>,
 				// even when cancelling the keydown event.
 				if ( !options.newlinesEnabled && prevValue.match( /<br>$/ ) ) {
 					prevValue = prevValue.substr( 0, prevValue.length - 4 );
 				}
 				
-				editable.trigger(options.changeEvent, [ prevValue ]);
+				editable.trigger( options.changeEvent, [ prevValue ] );
 			}
 			
 			var cancel = function( ev ) {
@@ -55,7 +67,6 @@
 				ev.stopImmediatePropagation();
 				stopEditing();
 				editable.html( prevValue );
-				return false;
 			}
 			
 			// Save references and attach events
@@ -83,6 +94,13 @@
 			options.saveOnBlur && editable.blur( save );
 			
 			options.compensateTopMargin && buttons.css( { 'margin-top': editable.css('margin-top') } );
+			
+			/**
+			 * Determine if 'editable' is in edit or read mode
+			 */
+			function isInEditMode() {
+				return editable.attr('contentEditable') === 'true';
+			}
 			
 			/**
 			 * Makes element editable
