@@ -38,15 +38,9 @@
 			
 			var save = function( ev ) {
 				// If the event is 'blur', defer executing the save, to allow 'click' events (on one of the buttons) to trigger first.
-				if ( ev.type === 'blur' ) {
-					ev.type = 'blurred';
-					setTimeout( function() { save( ev ) }, 10 );
-					return;
-				}
-				
-				if ( !isInEditMode() ) {
-					return;
-				}
+				console.debug( ev );
+
+				console.debug('save');
 				
 				ev.preventDefault();
 				ev.stopImmediatePropagation();
@@ -63,6 +57,7 @@
 			}
 			
 			var cancel = function( ev ) {
+				console.debug('cancel');
 				ev.preventDefault();
 				ev.stopImmediatePropagation();
 				stopEditing();
@@ -74,12 +69,12 @@
 			buttons.find('.save').click( save );
 			buttons.find('.cancel').click( cancel );
 			
-			// Display only edit button
+			// Display only the 'edit' button by default
 			buttons.children().css('display', 'none');
 			editEl.show();
 			
-			editable.dblclick( edit );
-			// Bind on 'keydown' so we'll be first; for example, jQuery.ui.dialog closes the dialog on keydown for escape.
+			// Bind on 'keydown' so we'll be first to handle keypresses, hopefully;
+			// for example, jQuery.ui.dialog closes the dialog on keydown for escape.
 			editable.keydown( function( ev ) {
 				// Save on enter, if not allowed to add newlines
 				if ( ev.keyCode === 13 && !options.newlinesEnabled ) {
@@ -91,15 +86,17 @@
 				}
 			});
 			
-			options.saveOnBlur && editable.blur( save );
-			
+			options.editOnDblClick && editable.dblclick( edit );
 			options.compensateTopMargin && buttons.css( { 'margin-top': editable.css('margin-top') } );
 			
 			/**
-			 * Determine if 'editable' is in edit or read mode
+			 * Trigger the 'save' function when the user clicks outside of both the 'editable', and outside of the 'buttons'.
 			 */
-			function isInEditMode() {
-				return editable.attr('contentEditable') === 'true';
+			function saveOnClickOutside( ev ) {
+				var target = $( ev.target );
+				if ( !target.closest( editable ).length && !target.closest( buttons ).length ) {
+					save( ev );
+				}
 			}
 			
 			/**
@@ -109,6 +106,7 @@
                 buttons.children().show();
                 editEl.hide();
 	            editable.attr('contentEditable', true).focus();
+				options.saveOnBlur && $('body').bind( 'click', saveOnClickOutside );
 			}
 			/**
 			 * Makes element non-editable
@@ -117,6 +115,7 @@
 				buttons.children().hide();
 				editEl.show().focus();
                 editable.attr('contentEditable', false);
+				options.saveOnBlur && $('body').unbind( 'click', saveOnClickOutside );
 			}
         });
     };
@@ -144,7 +143,11 @@
 		saveTitle: 'Save',
 		cancelTitle: 'Discard',
 		/**
-		 * Whether or not the 'blur' event should trigger 'save'.
+		 * Whether or not 'dblclick' should trigger 'edit'.
+		 */
+		editOnDblClick: true,
+		/**
+		 * Whether or not 'blur' (focusing away from the editable, and the buttons) should trigger 'save'.
 		 */
 		saveOnBlur: true,
 		showCancel: true
