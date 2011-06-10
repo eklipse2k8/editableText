@@ -1,6 +1,10 @@
 /**
  * editableText plugin that uses contentEditable property (FF2 is not supported)
  * Project page - https://github.com/PaulUithol/editableText
+ *
+ * Supports the Showdown JS parser for markdown.
+ *
+ *
  * Forked from http://github.com/valums/editableText, copyright (c) 2009 Andris Valums, http://valums.com
  * Licensed under the MIT license (http://valums.com/mit-license/)
  */
@@ -21,6 +25,12 @@
 			 */
 			var prevValue = editable.html();
 			
+			var markdown = options.allowMarkdown && Showdown && editable.data('markdown') != null;
+			if ( markdown ) {
+				var converter = new Showdown.converter();
+				editable.html( converter.makeHtml( prevValue ) );
+			}
+			
 			// Create edit/save buttons
 			var buttons = $(
 				"<div class='editableToolbar'>" +
@@ -34,6 +44,7 @@
 			var edit = function( ev ) {
 				ev.preventDefault();
 				startEditing();
+				markdown && editable.html( prevValue );
 			}
 			
 			var save = function( ev ) {
@@ -42,8 +53,11 @@
 				stopEditing();
 				prevValue = editable.html();
 				
-				// Strip trailing ' <br>'; seems to occur (at least in FF) when typing <space>, then <enter>,
-				// even when cancelling the keydown event.
+				// If using 'markdown', replace all <br> by \n.
+				if ( markdown ) {
+					editable.html( converter.makeHtml( prevValue.replace(/<br>/gi, '\n') ) );
+				}
+				// Strip a trailing '<br>'; seems to occur (at least in FF) when typing <space>, then <enter>, even when cancelling the keydown event.
 				if ( !options.newlinesEnabled && prevValue.match( /<br>$/ ) ) {
 					prevValue = prevValue.substr( 0, prevValue.length - 4 );
 				}
@@ -55,7 +69,7 @@
 				ev.preventDefault();
 				ev.stopImmediatePropagation();
 				stopEditing();
-				editable.html( prevValue );
+				editable.html( markdown ? converter.makeHtml( prevValue.replace(/<br>/gi, '\n') )  : prevValue );
 			}
 			
 			// Save references and attach events
@@ -115,6 +129,11 @@
     };
 	
 	$.fn.editableText.defaults = {
+		/**
+		 * Allow markdown if possible. If enabled, editables that have the attribute 'data-markdown'
+		 * will be treated as markdown (requires showdown.js to be loaded).
+		 */
+		allowMarkdown: true,
 		/**
 		 * Pass true to enable line breaks. Useful with divs that contain paragraphs.
 		 * If false, prevents user from adding newlines to headers, links, etc.
