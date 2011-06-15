@@ -24,11 +24,10 @@
 			 * Save value to restore if user presses cancel
 			 */
 			var prevValue = editable.html();
-			
 			var markdown = options.allowMarkdown && Showdown && editable.data('markdown') != null;
 			if ( markdown ) {
 				var converter = new Showdown.converter();
-				editable.html( converter.makeHtml( prevValue ) );
+				setContent( prevValue );
 			}
 			
 			// Create edit/save buttons
@@ -52,11 +51,8 @@
 				ev.stopImmediatePropagation();
 				stopEditing();
 				prevValue = editable.html();
+				setContent( prevValue );
 				
-				// If using 'markdown', replace all <br> by \n.
-				if ( markdown ) {
-					editable.html( converter.makeHtml( prevValue.replace(/<br>/gi, '\n') ) );
-				}
 				// Strip a trailing '<br>'; seems to occur (at least in FF) when typing <space>, then <enter>, even when cancelling the keydown event.
 				if ( !options.newlinesEnabled && prevValue.match( /<br>$/ ) ) {
 					prevValue = prevValue.substr( 0, prevValue.length - 4 );
@@ -69,7 +65,7 @@
 				ev.preventDefault();
 				ev.stopImmediatePropagation();
 				stopEditing();
-				editable.html( markdown ? converter.makeHtml( prevValue.replace(/<br>/gi, '\n') )  : prevValue );
+				setContent( prevValue );
 			}
 			
 			// Save references and attach events
@@ -94,8 +90,22 @@
 				}
 			});
 			
-			options.editOnDblClick && editable.dblclick( edit );
+			options.editOnDblClick && editable.dblclick( function() {
+					if ( editable.attr('contentEditable') !== 'true' ) {
+						edit.apply( this, arguments );
+					}
+				});
 			options.compensateTopMargin && buttons.css( { 'margin-top': editable.css('margin-top') } );
+			
+			function setContent( content ) {
+				// If using 'markdown', replace all <br> by \n.
+				if ( markdown ) {
+					editable.html( converter.makeHtml( content.replace(/<br>/gi, '\n') ) );
+				}
+				else {
+					editable.html( content );
+				}
+			}
 			
 			/**
 			 * Trigger the 'save' function when the user clicks outside of both the 'editable', and outside of the 'buttons'.
@@ -111,19 +121,21 @@
 			 * Makes element editable
 			 */
 			function startEditing() {
-                buttons.children().show();
-                editEl.hide();
-	            editable.attr('contentEditable', true).focus();
+				buttons.children().show();
+				editEl.hide();
+				editable.attr('contentEditable', true).focus();
 				options.saveOnBlur && $('body').bind( 'click', saveOnClickOutside );
 			}
+			
 			/**
 			 * Makes element non-editable
 			 */
 			function stopEditing() {
 				buttons.children().hide();
-				editEl.show().focus();
+				editEl.show();
                 editable.attr('contentEditable', false);
 				options.saveOnBlur && $('body').unbind( 'click', saveOnClickOutside );
+				editable.blur();
 			}
         });
     };
