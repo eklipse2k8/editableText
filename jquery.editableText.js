@@ -8,7 +8,7 @@
  * Forked from http://github.com/valums/editableText, copyright (c) 2009 Andris Valums, http://valums.com
  * Licensed under the MIT license (http://valums.com/mit-license/)
  */
-(function( $ ){		
+(function( $, undefined ){		
 	/**
 	 * Usage $('selector).editableText( options );
 	 * See $.fn.editableText.defaults for valid options 
@@ -24,21 +24,24 @@
 			 * Save value to restore if user presses cancel
 			 */
 			var prevValue = editable.html();
-			var markdown = options.allowMarkdown && Showdown && editable.data('markdown') != null;
+			var markdown = options.allowMarkdown && window.Showdown && editable.data('markdown') != null;
 			if ( markdown ) {
 				var converter = new Showdown.converter();
 				setContent( prevValue );
 			}
 			
 			// Create edit/save buttons
-			var buttons = $(
-				"<div class='editableToolbar'>" +
-					"<a href='#' class='edit' title='" + options.editTitle + "'></a>" +
-					"<a href='#' class='save' title='" + options.saveTitle + "'></a>" +
-					( options.showCancel ? "<a href='#' class='cancel' title='" + options.cancelTitle + "'></a>" : '' ) +
-				"</div>")
-				.insertBefore( editable )
-				.css( { 'zIndex': ( parseInt( editable.css('zIndex'), 10 ) || 0 ) + 1 } );
+			var buttons;
+			if ( options.showToolbar ) {
+				buttons = $(
+					"<div class='editableToolbar'>" +
+						( options.showEdit ? "<a href='#' class='edit' title='" + options.editTitle + "'></a>" : '' ) +
+						( options.showSave ? "<a href='#' class='save' title='" + options.saveTitle + "'></a>" : '' ) +
+						( options.showCancel ? "<a href='#' class='cancel' title='" + options.cancelTitle + "'></a>" : '' ) +
+					"</div>")
+					.insertBefore( editable )
+					.css( { 'zIndex': ( parseInt( editable.css('zIndex'), 10 ) || 0 ) + 1 } )
+			}
 			
 			var edit = function( ev ) {
 				ev.preventDefault();
@@ -69,13 +72,15 @@
 			}
 			
 			// Save references and attach events
-			var editEl = buttons.find('.edit').click( edit );
-			buttons.find('.save').click( save );
-			buttons.find('.cancel').click( cancel );
-			
-			// Display only the 'edit' button by default
-			buttons.children().css('display', 'none');
-			editEl.show();
+			if ( options.showToolbar ) {
+				var editEl = buttons.find('.edit').click( edit );
+				buttons.find('.save').click( save );
+				buttons.find('.cancel').click( cancel );
+				
+				// Display only the 'edit' button by default
+				buttons.children().css('display', 'none');
+				editEl.show();
+			}
 			
 			// Bind on 'keydown' so we'll be first to handle keypresses, hopefully;
 			// for example, jQuery.ui.dialog closes the dialog on keydown for escape.
@@ -95,7 +100,7 @@
 						edit.apply( this, arguments );
 					}
 				});
-			options.compensateTopMargin && buttons.css( { 'margin-top': editable.css('margin-top') } );
+			options.showToolbar && options.compensateTopMargin && buttons.css( { 'margin-top': editable.css('margin-top') } );
 			
 			function setContent( content ) {
 				// If using 'markdown', replace all <br> by \n.
@@ -121,21 +126,35 @@
 			 * Makes element editable
 			 */
 			function startEditing() {
-				buttons.children().show();
-				editEl.hide();
+				if ( options.showToolbar ) {
+					buttons.children().show();
+					editEl.hide();
+				}
+				
 				editable.attr('contentEditable', true).focus();
-				options.saveOnBlur && $('body').bind( 'click', saveOnClickOutside );
+				options.saveOnBlur && $( document ).bind( 'click', saveOnClickOutside );
+				
+				// Trigger callback/event
+				$.isFunction( options.startEditing ) && options.startEditing.call( editable[0] );
+				editable.trigger( 'startEditing' );
 			}
 			
 			/**
 			 * Makes element non-editable
 			 */
 			function stopEditing() {
-				buttons.children().hide();
-				editEl.show();
-                editable.attr('contentEditable', false);
-				options.saveOnBlur && $('body').unbind( 'click', saveOnClickOutside );
+				if ( options.showToolbar ) {
+					buttons.children().hide();
+					editEl.show();
+				}
+				
+				editable.attr('contentEditable', false);
+				options.saveOnBlur && $( document ).unbind( 'click', saveOnClickOutside );
 				editable.blur();
+				
+				// Trigger callback/event
+				$.isFunction( options.stopEditing ) && options.stopEditing.call( editable[0] );
+				editable.trigger( 'stopEditing' );
 			}
         });
     };
@@ -157,7 +176,14 @@
 		 */
 		changeEvent : 'change',
 		/**
-		 * Adjust the top margin for the buttons to the margin on the editable element.
+		 * Show options the toolbar (and it's individual buttons)
+		 */
+		showToolbar: true,
+		showCancel: true,
+		showEdit: true,
+		showSave: true,
+		/**
+		 * Adjust the top margin for the 'editableToolbar' to the margin on the editable element.
 		 * Useful for headings, etc.
 		 */
 		compensateTopMargin: true,
@@ -175,6 +201,10 @@
 		 * Whether or not 'blur' (focusing away from the editable, and the buttons) should trigger 'save'.
 		 */
 		saveOnBlur: true,
-		showCancel: true
+		/**
+		 * Callbacks
+		 */
+		startEditing: null,
+		stopEditing: null
 	};
 })( jQuery );
