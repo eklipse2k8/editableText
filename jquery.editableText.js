@@ -18,16 +18,61 @@
 		
         return this.each( function() {
 			// Add jQuery methods to the element
-			var editable = $(this);
+			var editable = $( this );
+			var markdown = options.allowMarkdown && window.Showdown && editable.data('markdown') != null;
+			
+			// 'Edit' action
+			var edit = function( ev ) {
+				ev.preventDefault();
+				startEditing();
+				markdown && editable.html( value );
+			};
+			
+			// 'Save' action
+			var save = function( ev ) {
+				ev.preventDefault();
+				ev.stopImmediatePropagation();
+				stopEditing();
+				var prevValue = value;
+				value = editable.html();
+				setContent( value );
+				
+				// Strip trailing '<br>' from 'value'; seems to occur (at least in FF) when typing <space>,
+				// then <enter> (even when cancelling the keydown event).
+				if ( !options.newlinesEnabled && value.match( /<br>$/ ) ) {
+					value = value.substr( 0, value.length - 4 );
+				}
+				
+				$.isFunction( options.change ) && options.change.call( editable[0], value, prevValue );
+				editable.trigger( options.changeEvent, [ value, prevValue ] );
+			};
+			
+			// 'Cancel' action
+			var cancel = function( ev ) {
+				ev.preventDefault();
+				ev.stopImmediatePropagation();
+				stopEditing();
+				setContent( value );
+			};
+			
+			var setContent = function( content ) {
+				// When using 'markdown', replace all <br> by \n.
+				if ( markdown ) {
+					editable.html( converter.makeHtml( content.replace(/<br>/gi, '\n') ) );
+				}
+				else {
+					editable.html( content );
+				}
+			};
 			
 			/**
-			 * Save value to restore if user presses cancel
+			 * 'value' is saved in 'startEditing', so we can restore the original content if editing is cancelled.
 			 */
-			var prevValue = editable.html();
-			var markdown = options.allowMarkdown && window.Showdown && editable.data('markdown') != null;
+			var value = editable.html();
+			
 			if ( markdown ) {
 				var converter = new Showdown.converter();
-				setContent( prevValue );
+				setContent( value );
 			}
 			
 			// Create edit/save buttons
@@ -41,44 +86,16 @@
 					"</div>")
 					.insertBefore( editable )
 					.css( { 'zIndex': ( parseInt( editable.css('zIndex'), 10 ) || 0 ) + 1 } )
-			}
-			
-			var edit = function( ev ) {
-				ev.preventDefault();
-				startEditing();
-				markdown && editable.html( prevValue );
-			}
-			
-			var save = function( ev ) {
-				ev.preventDefault();
-				ev.stopImmediatePropagation();
-				stopEditing();
-				prevValue = editable.html();
-				setContent( prevValue );
 				
-				// Strip a trailing '<br>'; seems to occur (at least in FF) when typing <space>, then <enter>, even when cancelling the keydown event.
-				if ( !options.newlinesEnabled && prevValue.match( /<br>$/ ) ) {
-					prevValue = prevValue.substr( 0, prevValue.length - 4 );
-				}
+				options.compensateTopMargin && buttons.css( { 'margin-top': editable.css('margin-top') } );
 				
-				editable.trigger( options.changeEvent, [ prevValue ] );
-			}
-			
-			var cancel = function( ev ) {
-				ev.preventDefault();
-				ev.stopImmediatePropagation();
-				stopEditing();
-				setContent( prevValue );
-			}
-			
-			// Save references and attach events
-			if ( options.showToolbar ) {
+				// Save references and attach events
 				var editEl = buttons.find('.edit').click( edit );
 				buttons.find('.save').click( save );
 				buttons.find('.cancel').click( cancel );
 				
 				// Display only the 'edit' button by default
-				buttons.children().css('display', 'none');
+				buttons.children().hide();
 				editEl.show();
 			}
 			
@@ -100,17 +117,6 @@
 						edit.apply( this, arguments );
 					}
 				});
-			options.showToolbar && options.compensateTopMargin && buttons.css( { 'margin-top': editable.css('margin-top') } );
-			
-			function setContent( content ) {
-				// If using 'markdown', replace all <br> by \n.
-				if ( markdown ) {
-					editable.html( converter.makeHtml( content.replace(/<br>/gi, '\n') ) );
-				}
-				else {
-					editable.html( content );
-				}
-			}
 			
 			/**
 			 * Trigger the 'save' function when the user clicks outside of both the 'editable', and outside of the 'buttons'.
@@ -204,6 +210,7 @@
 		/**
 		 * Callbacks
 		 */
+		change: null,
 		startEditing: null,
 		stopEditing: null
 	};
