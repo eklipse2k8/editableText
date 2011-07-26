@@ -8,179 +8,212 @@
  * Forked from http://github.com/valums/editableText, copyright (c) 2009 Andris Valums, http://valums.com
  * Licensed under the MIT license (http://valums.com/mit-license/)
  */
-(function( $, undefined ){		
-	/**
-	 * Usage $('selector).editableText( options );
-	 * See $.fn.editableText.defaults for valid options 
-	 */
-    $.fn.editableText = function( options ) {
-		options = $.extend({}, $.fn.editableText.defaults, options);
+(function( $, undefined ){
+	
+	$.editableText = function() { return this.init.apply( this, arguments ); };
+	
+	$.editableText.prototype = {
+		// Properties
+		element: null,
+		options: null,
 		
-        return this.each( function() {
-			// Add jQuery methods to the element
-			var editable = $( this );
-			var markdown = options.allowMarkdown && window.Showdown && editable.data('markdown') != null;
+		buttons: null,
+		editButton: null,
+		value: null,
+		converter: null,
+		useMarkdown: null,
+		
+		init: function( element, options ) {
+			var dit = this;
+			this.element = $( element );
+			this.options = options;
+			this.useMarkdown = options.enableMarkdown && window.Showdown && this.element.data('markdown') != null;
+			//console.debug( 'element=%o, options=%o', this.element, this.options );
 			
-			// 'Edit' action
-			var edit = function( ev ) {
-				ev.preventDefault();
-				startEditing();
-				markdown && editable.html( value );
-			};
+			// 'this.value' is saved in 'startEditing', so we can restore the original content if editing is cancelled.
+			this.value = this.element.html();
 			
-			// 'Save' action
-			var save = function( ev ) {
-				ev.preventDefault();
-				ev.stopImmediatePropagation();
-				stopEditing();
-				var prevValue = value;
-				value = editable.html();
-				setContent( value );
-				
-				// Strip trailing '<br>' from 'value'; seems to occur (at least in FF) when typing <space>,
-				// then <enter> (even when cancelling the keydown event).
-				if ( !options.newlinesEnabled && value.match( /<br>$/ ) ) {
-					value = value.substr( 0, value.length - 4 );
-				}
-				
-				$.isFunction( options.change ) && options.change.call( editable[0], value, prevValue );
-				editable.trigger( options.changeEvent, [ value, prevValue ] );
-			};
-			
-			// 'Cancel' action
-			var cancel = function( ev ) {
-				ev.preventDefault();
-				ev.stopImmediatePropagation();
-				stopEditing();
-				setContent( value );
-			};
-			
-			var setContent = function( content ) {
-				// When using 'markdown', replace all <br> by \n.
-				if ( markdown ) {
-					editable.html( converter.makeHtml( content.replace(/<br>/gi, '\n') ) );
-				}
-				else {
-					editable.html( content );
-				}
-			};
-			
-			/**
-			 * 'value' is saved in 'startEditing', so we can restore the original content if editing is cancelled.
-			 */
-			var value = editable.html();
-			
-			if ( markdown ) {
-				var converter = new Showdown.converter();
-				setContent( value );
+			if ( this.useMarkdown ) {
+				this.converter = new Showdown.converter();
+				this._setContent( this.value );
 			}
 			
 			// Create edit/save buttons
-			var buttons;
+			this.buttons;
 			if ( options.showToolbar ) {
-				buttons = $(
+				this.buttons = $(
 					"<div class='editableToolbar'>" +
 						( options.showEdit ? "<a href='#' class='edit' title='" + options.editTitle + "'></a>" : '' ) +
 						( options.showSave ? "<a href='#' class='save' title='" + options.saveTitle + "'></a>" : '' ) +
 						( options.showCancel ? "<a href='#' class='cancel' title='" + options.cancelTitle + "'></a>" : '' ) +
 					"</div>")
-					.insertBefore( editable )
-					.css( { 'zIndex': ( parseInt( editable.css('zIndex'), 10 ) || 0 ) + 1 } )
+					.insertBefore( this.element )
+					.css( { 'zIndex': ( parseInt( this.element.css('zIndex'), 10 ) || 0 ) + 1 } )
 				
-				options.compensateTopMargin && buttons.css( { 'margin-top': editable.css('margin-top') } );
+				options.compensateTopMargin && this.buttons.css( { 'margin-top': this.element.css('margin-top') } );
+				
+				// Hide buttons; display only the 'edit' button by default
+				this.buttons.children().hide();
 				
 				// Save references and attach events
-				var editEl = buttons.find('.edit').click( edit );
-				buttons.find('.save').click( save );
-				buttons.find('.cancel').click( cancel );
-				
-				// Display only the 'edit' button by default
-				buttons.children().hide();
-				editEl.show();
+				this.editButton = this.buttons.find('.edit').click( $.proxy( this.edit, this ) ).show();
+				this.buttons.find('.save').click( $.proxy( this.save, this ) );
+				this.buttons.find('.cancel').click( $.proxy( this.cancel, this ) );
 			}
 			
 			// Bind on 'keydown' so we'll be first to handle keypresses, hopefully;
 			// for example, jQuery.ui.dialog closes the dialog on keydown for escape.
-			editable.keydown( function( ev ) {
+			this.element.keydown( function( ev ) {
 				// Save on enter, if not allowed to add newlines
 				if ( ev.keyCode === 13 && !options.newlinesEnabled ) {
-					save( ev );
+					dit.save( ev );
 				}
 				// Cancel on escape
 				if ( ev.keyCode === 27 ) {
-					cancel( ev );
+					dit.cancel( ev );
 				}
 			});
 			
-			options.editOnDblClick && editable.dblclick( function() {
-					if ( editable.attr('contentEditable') !== 'true' ) {
-						edit.apply( this, arguments );
+			options.editOnDblClick && this.element.dblclick( function() {
+					if ( dit.element.attr( 'contentEditable' ) !== 'true' ) {
+						dit.edit.apply( dit, arguments );
 					}
 				});
+		},
+		
+		/**
+		 * 'Edit' action
+		 */
+		edit: function( ev ) {
+			ev && ev.preventDefault();
+			this._startEditing();
+			this.useMarkdown && this.element.html( this.value );
+		},
+		
+		/**
+		 * 'Save' action
+		 */
+		save: function( ev ) {
+			ev && ev.preventDefault();
+			ev && ev.stopImmediatePropagation();
+			this._stopEditing();
+			var prevValue = this.value;
+			this.value = this.element.html();
+			this._setContent( this.value );
 			
-			/**
-			 * Trigger the 'save' function when the user clicks outside of both the 'editable', and outside of the 'buttons'.
-			 */
-			function saveOnClickOutside( ev ) {
-				var target = $( ev.target );
-				if ( !target.closest( editable ).length && !target.closest( buttons ).length ) {
-					save( ev );
-				}
+			// Strip trailing '<br>' from 'value'; seems to occur (at least in FF) when typing <space>,
+			// then <enter> (even when cancelling the keydown event).
+			if ( !this.options.newlinesEnabled && this.value.match( /<br>$/ ) ) {
+				this.value = this.value.substr( 0, this.value.length - 4 );
 			}
 			
-			/**
-			 * Makes element editable
-			 */
-			function startEditing() {
-				if ( options.showToolbar ) {
-					buttons.children().show();
-					editEl.hide();
-				}
-				
-				editable.attr('contentEditable', true).focus();
-				options.saveOnBlur && $( document ).bind( 'click', saveOnClickOutside );
-				
-				// Trigger callback/event
-				$.isFunction( options.startEditing ) && options.startEditing.call( editable[0] );
-				editable.trigger( 'startEditing' );
+			$.isFunction( this.options.change ) && this.options.change.call( this.element[0], this.value, prevValue );
+			this.element.trigger( 'change', [ this.value, prevValue ] );
+		},
+		
+		/**
+		 * 'Cancel' action
+		 */
+		cancel: function( ev ) {
+			ev && ev.preventDefault();
+			ev && ev.stopImmediatePropagation();
+			this._stopEditing();
+			this._setContent( this.value );
+		},
+		
+		/**
+		 * Makes element editable
+		 */
+		_startEditing: function() {
+			if ( this.options.showToolbar ) {
+				this.buttons.children().show();
+				this.editButton.hide();
 			}
 			
-			/**
-			 * Makes element non-editable
-			 */
-			function stopEditing() {
-				if ( options.showToolbar ) {
-					buttons.children().hide();
-					editEl.show();
-				}
-				
-				editable.attr('contentEditable', false);
-				options.saveOnBlur && $( document ).unbind( 'click', saveOnClickOutside );
-				editable.blur();
-				
-				// Trigger callback/event
-				$.isFunction( options.stopEditing ) && options.stopEditing.call( editable[0] );
-				editable.trigger( 'stopEditing' );
+			this.element.attr( 'contentEditable', true ).focus();
+			this.options.saveOnBlur && $( document ).bind( 'click', $.proxy( this._saveOnClickOutside, this ) );
+			
+			// Trigger callback/event
+			$.isFunction( this.options.startEditing ) && this.options.startEditing.call( this.element[0] );
+			this.element.trigger( 'startEditing' );
+		},
+		
+		/**
+		 * Makes element non-editable
+		 */
+		_stopEditing: function() {
+			if ( this.options.showToolbar ) {
+				this.buttons.children().hide();
+				this.editButton.show();
 			}
-        });
+			
+			this.element.attr( 'contentEditable', false );
+			this.options.saveOnBlur && $( document ).unbind( 'click', this.saveOnClickOutside );
+			this.element.blur();
+			
+			// Trigger callback/event
+			$.isFunction( this.options.stopEditing ) && this.options.stopEditing.call( this.element[0] );
+			this.element.trigger( 'stopEditing' );
+		},
+		
+		_setContent: function( content ) {
+			// When 'useMarkdown', replace all <br> by \n.
+			if ( this.useMarkdown ) {
+				this.element.html( this.converter.makeHtml( content.replace( /<br>/gi, '\n' ) ) );
+			}
+			else {
+				this.element.html( content );
+			}
+		},
+		
+		/**
+		 * Trigger the 'save' function when the user clicks outside of both the 'editable', and outside of the 'buttons'.
+		 */
+		_saveOnClickOutside: function( ev ) {
+			var target = $( ev.target );
+			if ( !target.closest( this.element ).length && !target.closest( this.buttons ).length ) {
+				this.save( ev );
+			}
+		}
+	};
+	
+	/**
+	 * Usage $('selector).editableText( options );
+	 * See $.fn.editableText.defaults for valid options 
+	 */
+    $.fn.editableText = function( options ) {
+		var args = Array.prototype.slice.call( arguments, 1 );
+		
+		return this.each( function() {
+			var instance = $.data( this, '$.editableText' );
+			console.debug( 'instance=%o, options=%o', instance, options );
+			// constructor
+			if ( !instance ) {
+				options = $.extend( {}, $.fn.editableText.defaults, options );
+				$.data( this, '$.editableText', new $.editableText( this, options ) );
+			}
+			// regular method
+			else if ( typeof options === 'string' && options[0] !== '_' && $.isFunction( instance[ options ] ) ) {
+				instance[ options ].apply( instance, args );
+			}
+			else {
+				console && console.warn('$.editableText "%o" does not have a (public) method "%o".', instance, options );
+				throw new Error('$.editableText "' + instance + '" does not have a (public) method "' + options + '".' );
+			}
+		});
     };
 	
 	$.fn.editableText.defaults = {
 		/**
-		 * Allow markdown if possible. If enabled, editables that have the attribute 'data-markdown'
+		 * Enable markdown if possible. If enabled, editables that have the attribute 'data-markdown'
 		 * will be treated as markdown (requires showdown.js to be loaded).
 		 */
-		allowMarkdown: true,
+		enableMarkdown: true,
 		/**
 		 * Pass true to enable line breaks. Useful with divs that contain paragraphs.
 		 * If false, prevents user from adding newlines to headers, links, etc.
 		 */
 		newlinesEnabled : false,
-		/**
-		 * Event that is triggered when editable text is changed.
-		 * Passes the new element value as the first parameter.
-		 */
-		changeEvent : 'change',
 		/**
 		 * Show options the toolbar (and it's individual buttons)
 		 */
@@ -208,7 +241,7 @@
 		 */
 		saveOnBlur: true,
 		/**
-		 * Callbacks
+		 * Callbacks. Fired when the value of the editable is changed, when editing is started, or when editing is stopped.
 		 */
 		change: null,
 		startEditing: null,
