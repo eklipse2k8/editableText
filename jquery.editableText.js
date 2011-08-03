@@ -28,6 +28,11 @@
 			this.element = $( element );
 			this.options = options;
 			this.useMarkdown = options.enableMarkdown && window.Showdown && this.element.data('markdown') != null;
+			
+			this.edit = $.proxy( this.edit, this );
+			this.save = $.proxy( this.save, this );
+			this.cancel = $.proxy( this.cancel, this );
+			
 			//console.debug( 'element=%o, options=%o', this.element, this.options );
 			
 			// 'this.value' is saved in 'startEditing', so we can restore the original content if editing is cancelled.
@@ -56,9 +61,9 @@
 				this.buttons.children().hide();
 				
 				// Save references and attach events
-				this.editButton = this.buttons.find('.edit').click( $.proxy( this.edit, this ) ).show();
-				this.buttons.find('.save').click( $.proxy( this.save, this ) );
-				this.buttons.find('.cancel').click( $.proxy( this.cancel, this ) );
+				this.editButton = this.buttons.find('.edit').click( this.edit ).show();
+				this.buttons.find('.save').click( this.save );
+				this.buttons.find('.cancel').click( this.cancel );
 			}
 			
 			// Bind on 'keydown' so we'll be first to handle keypresses, hopefully;
@@ -74,17 +79,22 @@
 				}
 			});
 			
-			options.editOnDblClick && this.element.dblclick( function() {
-					if ( dit.element.attr( 'contentEditable' ) !== 'true' ) {
-						dit.edit.apply( dit, arguments );
-					}
-				});
+			options.editOnDblClick && this.element.dblclick( this.edit );
+			
+			// Add the contenteditable attribute to element
+			if ( this.element.attr( 'contenteditable' ) == null ) {
+				this.element.attr( 'contenteditable', 'false' );
+			}
 		},
 		
 		/**
 		 * 'Edit' action
 		 */
 		edit: function( ev ) {
+			if ( this.element.attr( 'contenteditable' ) === 'true' ) {
+				return;
+			}
+			
 			ev && ev.preventDefault();
 			this._startEditing();
 			this.useMarkdown && this.element.html( this.value );
@@ -94,6 +104,10 @@
 		 * 'Save' action
 		 */
 		save: function( ev ) {
+			if ( this.element.attr( 'contenteditable' ) !== 'true' ) {
+				return;
+			}
+			
 			ev && ev.preventDefault();
 			ev && ev.stopImmediatePropagation();
 			this._stopEditing();
@@ -115,6 +129,10 @@
 		 * 'Cancel' action
 		 */
 		cancel: function( ev ) {
+			if ( this.element.attr( 'contenteditable' ) !== 'true' ) {
+				return;
+			}
+			
 			ev && ev.preventDefault();
 			ev && ev.stopImmediatePropagation();
 			this._stopEditing();
@@ -130,7 +148,7 @@
 				this.editButton.hide();
 			}
 			
-			this.element.attr( 'contentEditable', true ).focus();
+			this.element.attr( 'contenteditable', 'true' ).focus();
 			this.options.saveOnBlur && $( document ).bind( 'click', $.proxy( this._saveOnClickOutside, this ) );
 			
 			// Trigger callback/event
@@ -147,7 +165,7 @@
 				this.editButton.show();
 			}
 			
-			this.element.attr( 'contentEditable', false );
+			this.element.attr( 'contenteditable', 'false' );
 			this.options.saveOnBlur && $( document ).unbind( 'click', this.saveOnClickOutside );
 			this.element.blur();
 			
@@ -186,7 +204,7 @@
 		
 		return this.each( function() {
 			var instance = $.data( this, '$.editableText' );
-			console.debug( 'instance=%o, options=%o', instance, options );
+			
 			// constructor
 			if ( !instance ) {
 				options = $.extend( {}, $.fn.editableText.defaults, options );
