@@ -45,15 +45,18 @@
 			
 			// Create edit/save buttons
 			this.buttons;
-			if ( options.showToolbar ) {
+			if ( options.showToolbar === 'after' || options.showToolbar === 'before' ) {
 				this.buttons = $(
 					"<div class='editableToolbar'>" +
 						( options.showEdit ? "<a href='#' class='edit' title='" + options.editTitle + "'></a>" : '' ) +
 						( options.showSave ? "<a href='#' class='save' title='" + options.saveTitle + "'></a>" : '' ) +
 						( options.showCancel ? "<a href='#' class='cancel' title='" + options.cancelTitle + "'></a>" : '' ) +
-					"</div>")
-					.insertBefore( this.element )
-					.css( { 'zIndex': ( parseInt( this.element.css('zIndex'), 10 ) || 0 ) + 1 } )
+					"</div>");
+				
+				// Insert the toolbar 'after' or 'before'
+				this.element[ options.showToolbar ]( this.buttons );
+				
+				this.buttons.css( { 'zIndex': ( parseInt( this.element.css('zIndex'), 10 ) || 0 ) + 1 } );
 				
 				options.compensateTopMargin && this.buttons.css( { 'margin-top': this.element.css('margin-top') } );
 				
@@ -222,6 +225,7 @@
     };
 	
 	$.fn.editableText.defaults = {
+		
 		/**
 		 * Enable markdown if possible. If enabled, editables that have the attribute 'data-markdown'
 		 * will be treated as markdown (requires showdown.js to be loaded).
@@ -233,9 +237,13 @@
 		 */
 		newlinesEnabled : false,
 		/**
-		 * Show options the toolbar (and it's individual buttons)
+		 * Show options for the toolbar. The toolbar can be inserted 'before' or 'after', and disabled by setting
+		 * this option to 'false' (bool).
 		 */
-		showToolbar: true,
+		showToolbar: 'before',
+		/**
+		 * Show options for individual toolbar buttons
+		 */
 		showCancel: true,
 		showEdit: true,
 		showSave: true,
