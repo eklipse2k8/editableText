@@ -46,12 +46,10 @@
 			// Create edit/save buttons
 			this.buttons;
 			if ( options.showToolbar === 'after' || options.showToolbar === 'before' ) {
-				this.buttons = $(
-					"<div class='editableToolbar'>" +
-						( options.showEdit ? "<a href='#' class='edit' title='" + options.editTitle + "'></a>" : '' ) +
-						( options.showSave ? "<a href='#' class='save' title='" + options.saveTitle + "'></a>" : '' ) +
-						( options.showCancel ? "<a href='#' class='cancel' title='" + options.cancelTitle + "'></a>" : '' ) +
-					"</div>");
+				this.buttons = $( '<div>', { 'class': 'editableToolbar' } );
+				options.showEdit && this.buttons.append( $( '<a>', { 'class': 'edit', href: '#', role: 'button', title: options.editTitle } ) );
+				options.showSave && this.buttons.append( $( '<a>', { 'class': 'save', href: '#', role: 'button', title: options.saveTitle } ) );
+				options.showCancel && this.buttons.append( $( '<a>', { 'class': 'cancel', href: '#', role: 'button', title: options.cancelTitle } ) );
 				
 				// Insert the toolbar 'after' or 'before'
 				this.element[ options.showToolbar ]( this.buttons );
